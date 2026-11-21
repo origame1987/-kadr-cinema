@@ -19,4 +19,25 @@ function drawChannels(){document.getElementById('channels').innerHTML=channels.l
 function play(i){document.getElementById('player').src=channels[i].url;document.getElementById('player').play().catch(()=>{})}
 function removeChannel(i){channels.splice(i,1);save();render()}
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});render();
+</script><script>
+(function(){
+const app=document.getElementById('app'),dialog=document.getElementById('detail'),body=document.getElementById('detailBody');
+let shows=[],term='',genre='Все',mode='home',pending=0;
+const clean=t=>String(t||'').replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"');
+const esc=t=>clean(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const favorites=()=>JSON.parse(localStorage.getItem('kadr-show-favs')||'[]');
+function tile(x){return '<article class="tile" data-show="'+x.id+'"><div class="poster" style="background:'+ (x.image?'url('+x.image.medium+') center/cover':'linear-gradient(130deg,#222,#333)')+'"></div><div class="info"><strong>'+esc(x.name)+'</strong><small>★ '+(x.rating.average||'—')+' · '+esc((x.genres||[]).slice(0,2).join(', ')||'Сериал')+'</small></div></article>'}
+function draw(){window.page=mode;document.querySelectorAll('nav button').forEach((b,i)=>b.classList.toggle('active',['home','catalog','favorites','iptv','settings'][i]===mode));if(mode==='iptv'||mode==='settings'){window.render();return}
+let list=mode==='favorites'?shows.filter(x=>favorites().includes(x.id)):shows.filter(x=>(genre==='Все'||x.genres.includes(genre))&&x.name.toLowerCase().includes(term.toLowerCase()));
+let genres=['Все',...new Set(shows.flatMap(x=>x.genres))];
+app.innerHTML=(mode==='home'?'<div class="hero"><span>КАДР ORIGINAL EXPERIENCE</span><h2>Сериалы, которые захватывают</h2><p>Настоящие постеры, рейтинги и описания. Исследуй истории, добавляй любимое в избранное.</p><button class="primary" id="browse">Исследовать каталог</button></div>':'<h2>'+(mode==='favorites'?'Избранное':'Сериалы и шоу')+'</h2>')+(mode==='catalog'?'<div class="toolbar"><input id="showSearch" placeholder="Найти сериал" value="'+esc(term)+'"><select id="showGenre">'+genres.map(g=>'<option '+(g===genre?'selected':'')+'>'+esc(g)+'</option>').join('')+'</select></div>':'')+'<h2>'+(mode==='home'?'Популярные сериалы':'')+'</h2><div class="grid">'+list.map(tile).join('')+'</div>'+(list.length?'':'<p class="muted">Ничего не найдено. Попробуй другой запрос.</p>')+'<p class="muted" style="font-size:12px;margin-top:35px">Данные и постеры: <a style="color:var(--accent)" href="https://www.tvmaze.com/" target="_blank" rel="noopener">TVmaze</a>. Просмотр полного видео не предоставляется.</p>';
+app.querySelectorAll('[data-show]').forEach(el=>el.onclick=()=>details(Number(el.dataset.show)));
+if(app.querySelector('#browse'))app.querySelector('#browse').onclick=()=>{mode='catalog';draw()};
+if(app.querySelector('#showSearch'))app.querySelector('#showSearch').oninput=e=>{term=e.target.value;const pos=e.target.selectionStart;draw();const n=app.querySelector('#showSearch');n.focus();n.setSelectionRange(pos,pos)};
+if(app.querySelector('#showGenre'))app.querySelector('#showGenre').onchange=e=>{genre=e.target.value;draw()};
+}
+function details(id){const x=shows.find(x=>x.id===id);if(!x)return;const liked=favorites().includes(id);body.innerHTML='<div style="display:flex;gap:18px;align-items:start;flex-wrap:wrap"><img style="width:160px;max-width:40%;border-radius:12px" src="'+esc(x.image?.medium||'')+'" alt=""><div style="flex:1;min-width:180px"><h2>'+esc(x.name)+'</h2><p>★ '+(x.rating.average||'—')+' · '+esc(x.genres.join(' / '))+'</p><p>'+esc(x.premiered||'')+'</p></div></div><p style="line-height:1.7">'+esc(x.summary||'Описание отсутствует.')+'</p><button class="primary" id="showFav">'+(liked?'♥ В избранном':'♡ В избранное')+'</button> <a href="'+esc(x.url||'https://www.tvmaze.com/')+'" target="_blank" rel="noopener" style="color:var(--accent);margin-left:10px">Информация о сериале</a>';dialog.showModal();document.getElementById('showFav').onclick=()=>{let a=favorites();a=a.includes(id)?a.filter(v=>v!==id):[...a,id];localStorage.setItem('kadr-show-favs',JSON.stringify(a));dialog.close();draw()}}
+async function load(){try{const ids=[82,169,73,431,123,83,335,2993,49,465,447,150,112,66,3353,536,527,618,2705,549];const results=await Promise.allSettled(ids.map(id=>fetch('https://api.tvmaze.com/shows/'+id).then(r=>{if(!r.ok)throw Error(r.status);return r.json()})));shows=results.filter(x=>x.status==='fulfilled').map(x=>x.value).filter(x=>x.image);if(!shows.length)throw Error('empty');draw()}catch(e){app.innerHTML='<h2>Каталог временно недоступен</h2><p class="muted">Проверь интернет и обнови страницу. IPTV остаётся доступным.</p><button id="retry">Повторить</button>';document.getElementById('retry').onclick=load}}
+document.querySelectorAll('nav button').forEach((b,i)=>b.onclick=()=>{mode=['home','catalog','favorites','iptv','settings'][i];draw()});load();
+})();
 </script></body></html>
